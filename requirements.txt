@@ -4,7 +4,7 @@ SpeechRecognition
 pydub
 keyboard
 faster_whisper
-
+pvrecorder
 
 
 
