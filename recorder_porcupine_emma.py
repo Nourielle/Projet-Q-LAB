@@ -17,7 +17,7 @@ import subprocess
 
 # Constantes
 ACCESS_KEY = "uBpKa3Nmidsl97vIjlL5yui5zDr2beiZ01v3tjeuDe6ZsMPV636ttg=="  # Ta clé Porcupine
-KEYWORDS = ["computer", "terminator"]
+KEYWORDS = ["computer", "terminator" ,"jarvis"]
 SENSITIVITY = 0.9
 SAVE_DIR = "enregistrements"
 MAX_RECORD_S = 300  # 5 minutes max

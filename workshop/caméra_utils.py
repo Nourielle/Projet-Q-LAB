@@ -23,6 +23,7 @@ def record_video(filename="capture.avi", duration=3600):
         if not ret:
             break
         out.write(frame)
+        # faire stop la video 
         # Affiche la vidéo en direct (optionnel)
         cv2.imshow('Enregistrement', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -31,10 +32,12 @@ def record_video(filename="capture.avi", duration=3600):
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-    print(f"Vidéo sauvegardée sous : {filename}")
+    print(f"Vidéo sauvegardée sous : {filename}") #modifie le non de file video
 
 def take_photo(filename="photo.jpg"):
     """
+    #supprime a photo 
+    
     Prend une photo depuis la webcam et la sauvegarde sous 'filename'.
     """
     cap = cv2.VideoCapture(0)
