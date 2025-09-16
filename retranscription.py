@@ -9,7 +9,6 @@ def transcrire_audio(fichier_audio):
         audio_data = recognizer.record(source)
 
     try:
-        # Utilisation du moteur Google Speech Recognition
         texte = recognizer.recognize_google(audio_data, language="fr-FR")
         print(f"✅ Transcription réussie :\n{texte}")
         return texte
@@ -22,13 +21,25 @@ def transcrire_audio(fichier_audio):
         return None
 
 def sauvegarder_transcription(texte, fichier_audio):
-    base, _ = os.path.splitext(fichier_audio)
-    fichier_txt = base + "_retranscription.txt"
+    # Crée le dossier "retranscriptions" s'il n'existe pas
+    dossier_retranscriptions = "retranscriptions"
+    os.makedirs(dossier_retranscriptions, exist_ok=True)
 
-    with open(fichier_txt, "w", encoding="utf-8") as f:
+    # Nom de base du fichier audio sans le chemin
+    nom_audio = os.path.basename(fichier_audio)
+    base, _ = os.path.splitext(nom_audio)
+
+    # Crée le nom du fichier texte
+    nom_fichier_txt = base + "_retranscription.txt"
+
+    # Chemin complet du fichier texte dans le bon dossier
+    chemin_txt = os.path.join(dossier_retranscriptions, nom_fichier_txt)
+
+    # Sauvegarde
+    with open(chemin_txt, "w", encoding="utf-8") as f:
         f.write(texte)
 
-    print(f"💾 Transcription sauvegardée dans : {fichier_txt}")
+    print(f"💾 Transcription sauvegardée dans : {chemin_txt}")
 
 def main():
     if len(sys.argv) < 2:
@@ -48,7 +59,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
