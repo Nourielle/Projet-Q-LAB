@@ -1,0 +1,9 @@
+numpy
+pvporcupine
+pvrecorder
+sounddevice
+wavio
+pytz
+cryptography
+faster-whisper
+python-dotenv
