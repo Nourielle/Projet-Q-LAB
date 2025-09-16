@@ -3,7 +3,7 @@ pytz
 SpeechRecognition
 pydub
 keyboard
-
+faster_whisper
 
 
 
