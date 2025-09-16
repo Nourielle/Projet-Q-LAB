@@ -1,97 +1,61 @@
-import pvporcupine
-import pyaudio
-import wave
-import struct
-from datetime import datetime
-import pytz 
-import os 
-import subprocess
+import speech_recognition as sr
+import os
+import sys
 
+def transcrire_audio(fichier_audio):
+    recognizer = sr.Recognizer()
 
-
-def record_audio(filename, duration=10, sample_rate=16000):
-    p = pyaudio.PyAudio()
-    stream = p.open(format=pyaudio.paInt16,
-                    channels=1,
-                    rate=sample_rate,
-                    input=True,
-                    frames_per_buffer=512)
-
-    print(f"Enregistrement de {duration} secondes en cours...")
-    frames = []
-
-    for _ in range(0, int(sample_rate / 512 * duration)):
-        data = stream.read(512)
-        frames.append(data)
-
-    print("Enregistrement terminé.")
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
-
-    wf = wave.open(filename, 'wb')
-    wf.setnchannels(1)
-    wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-    wf.setframerate(sample_rate)
-    wf.writeframes(b''.join(frames))
-    wf.close()
-
-
-def detect_keyword():
-    # Initialisation de Porcupine avec le mot-clé intégré "picovoice"
-    porcupine = pvporcupine.create(
-        access_key="uBpKa3Nmidsl97vIjlL5yui5zDr2beiZ01v3tjeuDe6ZsMPV636ttg==",
-        keywords=["computer"]
-    )
-    pa = pyaudio.PyAudio()
-
-    stream = pa.open(rate=porcupine.sample_rate,
-                     channels=1,
-                     format=pyaudio.paInt16,
-                     input=True,
-                     frames_per_buffer=porcupine.frame_length)
-
-    print("Écoute en cours... Dis le mot-clé pour déclencher l'enregistrement.") 
+    with sr.AudioFile(fichier_audio) as source:
+        audio_data = recognizer.record(source)
 
     try:
-        detected = False
-        # Écoute jusqu’à détection
-        while not detected:
-            pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
-            pcm = struct.unpack_from("h" * porcupine.frame_length, pcm)
+        texte = recognizer.recognize_google(audio_data, language="fr-FR")
+        print(f"Transcription réussie :\n{texte}")
+        return texte
 
-            keyword_index = porcupine.process(pcm)
-            if keyword_index >= 0:
-                print("Mot-clé détecté !")
-                detected = True
+    except sr.UnknownValueError:
+        print("ERREUR ! Impossible de comprendre l'audio.")
+        return None
+    except sr.RequestError as e:
+        print(f"ERREUR ! Erreur de connexion à l'API Google : {e}")
+        return None
 
-    finally:
-        stream.stop_stream()
-        stream.close()
-        pa.terminate()
-        porcupine.delete()
+def sauvegarder_transcription(texte, fichier_audio):
+    # Crée le dossier "retranscriptions" s'il n'existe pas
+    dossier_retranscriptions = "retranscriptions"
+    os.makedirs(dossier_retranscriptions, exist_ok=True)
 
-    # Lancer l'enregistrement une fois le mot-clé détecté
-    # === Création du dossier "enregistrements" s'il n'existe pas ===
-    dossier = "enregistrements"
-    os.makedirs(dossier, exist_ok=True)
+    # Nom de base du fichier audio sans le chemin
+    nom_audio = os.path.basename(fichier_audio)
+    base, _ = os.path.splitext(nom_audio)
 
-    # Obtenir la date/heure actuelle à Paris 
-    paris_tz = pytz.timezone("Europe/Paris")
-    now = datetime.now(paris_tz)
+    # Crée le nom du fichier texte
+    nom_fichier_txt = base + "_retranscription.txt"
 
-    # Créer le nom de fichier
-    nom_fichier = now.strftime("%Y-%m-%d_%H-%M-%S") + ".wav"
+    # Chemin complet du fichier texte dans le bon dossier
+    chemin_txt = os.path.join(dossier_retranscriptions, nom_fichier_txt)
 
-    # Chemin complet : enregistrements/2025-09-16_14-03-22.wav
-    chemin_complet = os.path.join(dossier, nom_fichier)
+    # Sauvegarde
+    with open(chemin_txt, "w", encoding="utf-8") as f:
+        f.write(texte)
 
-    # Lancer l'enregistrement 
-    record_audio(chemin_complet, duration=10)
+    print(f"Transcription sauvegardée dans : {chemin_txt}")
 
-    # Lancer la transcription automatiquement 
-    subprocess.run(["python", "retranscription.py", chemin_complet])
+def main():
+    if len(sys.argv) < 2:
+        print("Utilisation : python retranscription.py chemin/vers/fichier.wav")
+        sys.exit(1)
 
+    fichier_audio = sys.argv[1]
+
+    if not os.path.isfile(fichier_audio):
+        print("ERREUR ! Fichier audio introuvable :", fichier_audio)
+        sys.exit(1)
+
+    texte = transcrire_audio(fichier_audio)
+
+    if texte:
+        sauvegarder_transcription(texte, fichier_audio)
 
 if __name__ == "__main__":
-    detect_keyword()
+    main()
