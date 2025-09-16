@@ -2,6 +2,7 @@ pvporcupine pyaudio
 pytz
 SpeechRecognition
 pydub
+keyboard
 
 
 
