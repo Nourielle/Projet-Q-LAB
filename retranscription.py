@@ -10,14 +10,14 @@ def transcrire_audio(fichier_audio):
 
     try:
         texte = recognizer.recognize_google(audio_data, language="fr-FR")
-        print(f"✅ Transcription réussie :\n{texte}")
+        print(f"Transcription réussie :\n{texte}")
         return texte
 
     except sr.UnknownValueError:
-        print("❌ Impossible de comprendre l'audio.")
+        print("ERREUR ! Impossible de comprendre l'audio.")
         return None
     except sr.RequestError as e:
-        print(f"❌ Erreur de connexion à l'API Google : {e}")
+        print(f"ERREUR ! Erreur de connexion à l'API Google : {e}")
         return None
 
 def sauvegarder_transcription(texte, fichier_audio):
@@ -39,7 +39,7 @@ def sauvegarder_transcription(texte, fichier_audio):
     with open(chemin_txt, "w", encoding="utf-8") as f:
         f.write(texte)
 
-    print(f"💾 Transcription sauvegardée dans : {chemin_txt}")
+    print(f"Transcription sauvegardée dans : {chemin_txt}")
 
 def main():
     if len(sys.argv) < 2:
@@ -49,7 +49,7 @@ def main():
     fichier_audio = sys.argv[1]
 
     if not os.path.isfile(fichier_audio):
-        print("❌ Fichier audio introuvable :", fichier_audio)
+        print("ERREUR ! Fichier audio introuvable :", fichier_audio)
         sys.exit(1)
 
     texte = transcrire_audio(fichier_audio)
