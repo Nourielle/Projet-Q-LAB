@@ -4,20 +4,23 @@ import struct
 import wave
 from datetime import datetime
 import pytz
-
 import pvporcupine
 from pvrecorder import PvRecorder
-
 import keyboard
-import subprocess
+import subprocess 
+from aes_utils import encrypt_bytes
+import base64
+import json 
+
 
 
 # Constantes
-ACCESS_KEY = "uBpKa3Nmidsl97vIjlL5yui5zDr2beiZ01v3tjeuDe6ZsMPV636ttg=="  # Ta clé Porcupine
+ACCESS_KEY = "uBpKa3Nmidsl97vIjlL5yui5zDr2beiZ01v3tjeuDe6ZsMPV636ttg=="  
 KEYWORDS = ["computer", "terminator"]
 SENSITIVITY = 0.9
 SAVE_DIR = "enregistrements"
 MAX_RECORD_S = 300  # 5 minutes max
+ENCRYPTED_SAVE_DIR = "enregistrements chiffrés"
 
 
 def ensure_dir(path):
@@ -75,14 +78,33 @@ def detect_keyword():
                 # Vérifier durée max
                 elapsed = time.time() - record_start_time
                 if elapsed > MAX_RECORD_S:
-                    print(f"\n⏹️ Enregistrement arrêté automatiquement après {MAX_RECORD_S} secondes.")
+                    print(f"\nEnregistrement arrêté automatiquement après {MAX_RECORD_S} secondes.")
                     # Sauvegarder fichier
                     filename = os.path.join(SAVE_DIR, paris_filename())
                     write_wav_int16(bytes(audio_buffer), sample_rate, filename)
-                    print(f"✅ Enregistrement sauvegardé : {filename}")
+
+                    # Chiffrer l’audio WAV
+                    with open(filename, "rb") as f:
+                        contenu_audio = f.read()
+
+                    nonce, ciphertext = encrypt_bytes(contenu_audio)
+                    bundle = {
+                        "nonce": base64.urlsafe_b64encode(nonce).decode("utf-8"),
+                        "ciphertext": base64.urlsafe_b64encode(ciphertext).decode("utf-8")
+                    }
+                    ensure_dir(ENCRYPTED_SAVE_DIR)
+                    nom_fichier = os.path.basename(filename)  # juste le nom du fichier
+                    fichier_chiffre = os.path.join(ENCRYPTED_SAVE_DIR, nom_fichier + ".aes.json")
+                    with open(fichier_chiffre, "w", encoding="utf-8") as f:
+                        json.dump(bundle, f, indent=2)
+
+                    print(f"Audio chiffré sauvegardé : {fichier_chiffre}")
+
+                    print(f"Enregistrement sauvegardé : {filename}")
 
                     # Lancer la transcription
                     subprocess.run(["python", "retranscription.py", filename])
+                    os.remove(filename)
 
                     recording = False
                     audio_buffer.clear()
@@ -94,18 +116,36 @@ def detect_keyword():
                 recording = True
                 audio_buffer.clear()
                 record_start_time = time.time()
-                print("▶️ Mot-clé détecté : démarrage de l'enregistrement...")
+                print("Mot-clé détecté : démarrage de l'enregistrement...")
 
             elif recording and keyword_index == 1:
                 # Arrêter enregistrement
                 recording = False
                 filename = os.path.join(SAVE_DIR, paris_filename())
                 write_wav_int16(bytes(audio_buffer), sample_rate, filename)
-                print(f"⏹️ Mot-clé détecté : arrêt de l'enregistrement.")
-                print(f"✅ Enregistrement sauvegardé : {filename}")
+                print(f"Mot-clé détecté : arrêt de l'enregistrement.")
+                print(f"Enregistrement sauvegardé : {filename}")
+
+                # Chiffrer l’audio WAV
+                with open(filename, "rb") as f:
+                    contenu_audio = f.read()
+
+                nonce, ciphertext = encrypt_bytes(contenu_audio)
+                bundle = {
+                    "nonce": base64.urlsafe_b64encode(nonce).decode("utf-8"),
+                    "ciphertext": base64.urlsafe_b64encode(ciphertext).decode("utf-8")
+                }
+                ensure_dir(ENCRYPTED_SAVE_DIR)
+                nom_fichier = os.path.basename(filename)  # juste le nom du fichier
+                fichier_chiffre = os.path.join(ENCRYPTED_SAVE_DIR, nom_fichier + ".aes.json")
+                with open(fichier_chiffre, "w", encoding="utf-8") as f:
+                    json.dump(bundle, f, indent=2)
+
+                print(f"Audio chiffré sauvegardé : {fichier_chiffre}")
 
                 # Lancer la transcription
                 subprocess.run(["python", "retranscription.py", filename])
+                os.remove(filename)
 
                 audio_buffer.clear()
                 print("Retour à l'écoute...\n")
