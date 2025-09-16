@@ -1,3 +1,4 @@
+# coding: utf-8 
 import os
 import time
 import struct
@@ -10,6 +11,8 @@ from pvrecorder import PvRecorder
 
 import keyboard
 import subprocess
+
+# 
 
 
 # Constantes
