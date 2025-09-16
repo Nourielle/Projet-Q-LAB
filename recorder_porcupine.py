@@ -5,6 +5,8 @@ import struct
 from datetime import datetime
 import pytz 
 import os 
+import subprocess
+
 
 
 def record_audio(filename, duration=10, sample_rate=16000):
@@ -74,18 +76,21 @@ def detect_keyword():
     dossier = "enregistrements"
     os.makedirs(dossier, exist_ok=True)
 
-    # === Obtenir la date/heure actuelle à Paris ===
+    # Obtenir la date/heure actuelle à Paris 
     paris_tz = pytz.timezone("Europe/Paris")
     now = datetime.now(paris_tz)
 
-    # === Créer le nom de fichier ===
+    # Créer le nom de fichier
     nom_fichier = now.strftime("%Y-%m-%d_%H-%M-%S") + ".wav"
 
-    # === Chemin complet : enregistrements/2025-09-16_14-03-22.wav ===
+    # Chemin complet : enregistrements/2025-09-16_14-03-22.wav
     chemin_complet = os.path.join(dossier, nom_fichier)
 
-    # === Lancer l'enregistrement ===
+    # Lancer l'enregistrement 
     record_audio(chemin_complet, duration=10)
+
+    # Lancer la transcription automatiquement 
+    subprocess.run(["python", "retranscription.py", chemin_complet])
 
 
 if __name__ == "__main__":
