@@ -11,6 +11,7 @@ import subprocess
 from aes_utils import encrypt_bytes
 import base64
 import json 
+#from camera import recorder_video 
 
 
 
@@ -161,3 +162,6 @@ def detect_keyword():
 
 if __name__ == "__main__":
     detect_keyword()
+    #recorder_video.detect_keyword_video()
+
+
