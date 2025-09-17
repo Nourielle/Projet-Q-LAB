@@ -4,5 +4,5 @@ outputs/
 models/
 triggers/*.txt
 *_backup.py
-retranscriptions chiffrées/
-retranscriptions chiffrées/
+ retranscriptions_chiffrees/
+
