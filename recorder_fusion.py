@@ -22,7 +22,7 @@ from aes_utils import encrypt_bytes
 # ======  CONFIG  =========
 # =========================
 
-ACCESS_KEY = os.getenv("PICOVOICE_ACCESS_KEY") or "QGobPJP9Rzl7HaJdOhzn3Gs3RW7aWyLQVHtUh+NOfeI2+SffLM+eqQ=="  # remplace si besoin
+ACCESS_KEY = os.getenv("PICOVOICE_ACCESS_KEY") or "uBpKa3Nmidsl97vIjlL5yui5zDr2beiZ01v3tjeuDe6ZsMPV636ttg=="  # remplace si besoin
 
 # Wakewords:
 AUDIO_START_WORD = "computer"
@@ -32,9 +32,7 @@ STOP_WORD        = "alexa"
 SENSITIVITY = 0.9
 
 # Dossiers
-AUDIO_SAVE_DIR = "enregistrements"
 ENCRYPTED_SAVE_DIR = "enregistrements_chiffres"   
-VIDEO_SAVE_DIR = "videos"
 
 # Limites
 MAX_AUDIO_RECORD_S = 300   # 5 minutes max pour l'audio
@@ -123,7 +121,7 @@ class VideoRecorder:
     """
     def __init__(
         self,
-        save_dir="videos",
+        save_dir="videos_chiffrees",
         fps=20,
         fourcc="mp4v",
         resolution=None,               # ex: (1280, 720) ou None pour auto
@@ -265,10 +263,10 @@ class VideoRecorder:
                 try:
                     cv2.destroyWindow(self._win_name)
                 except Exception:
-                    pass
+                    pass 
 
 
-def encrypt_video_to_json(video_path: str, out_dir="videos_chiffres"):
+def encrypt_video_to_json(video_path: str, out_dir="videos_chiffrees"):
     """
     Lit un fichier vidéo MP4, chiffre son contenu avec AES-GCM et sauvegarde un JSON.
     """
@@ -297,9 +295,7 @@ def encrypt_video_to_json(video_path: str, out_dir="videos_chiffres"):
 # =========================
 
 def main():
-    ensure_dir(AUDIO_SAVE_DIR)
     ensure_dir(ENCRYPTED_SAVE_DIR)
-    ensure_dir(VIDEO_SAVE_DIR)
 
     # Porcupine avec 3 mots-clés (audio start / video start / stop)
     try:
@@ -324,9 +320,9 @@ def main():
     video_rec = VideoRecorder()
 
     print(f"Écoute en cours…\n"
-          f"- Dis '{AUDIO_START_WORD}' pour démarrer l'**audio**\n"
-          f"- Dis '{VIDEO_START_WORD}' pour démarrer la **vidéo**\n"
-          f"- Dis '{STOP_WORD}' pour **arrêter tout** (audio+vidéo)\n"
+          f"- Dis '{AUDIO_START_WORD}' pour démarrer l'audio\n"
+          f"- Dis '{VIDEO_START_WORD}' pour démarrer la vidéo\n"
+          f"- Dis '{STOP_WORD}' pour arrêter tout (audio+vidéo)\n"
           f"- Appuie sur [ESPACE] pour quitter.\n")
 
     audio_recording = False
@@ -345,8 +341,8 @@ def main():
                 elapsed = time.time() - audio_start_time
                 if elapsed > MAX_AUDIO_RECORD_S:
                     # auto stop audio
-                    audio_recording = False
-                    filename = os.path.join(AUDIO_SAVE_DIR, ts_name("audio", "wav"))
+                    audio_recording = False 
+                    filename = os.path.join(ENCRYPTED_SAVE_DIR, ts_name("audio", "wav"))
                     write_wav_int16(bytes(audio_buffer), sample_rate, filename)
                     print(f"[AUDIO] Auto-stop après {MAX_AUDIO_RECORD_S}s → {filename}")
 
@@ -388,7 +384,7 @@ def main():
                 # Stop audio si en cours
                 if audio_recording:
                     audio_recording = False
-                    filename = os.path.join(AUDIO_SAVE_DIR, ts_name("audio", "wav"))
+                    filename = os.path.join(ENCRYPTED_SAVE_DIR, ts_name("audio", "wav"))
                     write_wav_int16(bytes(audio_buffer), sample_rate, filename)
                     print(f"[AUDIO] Enregistrement sauvegardé : {filename}")
 
@@ -412,6 +408,14 @@ def main():
                 if video_rec._thread and video_rec._thread.is_alive():
                     video_rec.stop()
 
+                    # Chiffrement de la vidéo
+                    if video_rec._outfile and os.path.exists(video_rec._outfile):
+                        encrypt_video_to_json(video_rec._outfile)
+                        try:
+                            os.remove(video_rec._outfile)  # supprime la vidéo en clair
+                        except Exception:
+                            pass
+
     except KeyboardInterrupt:
         print("\n[INFO] Arrêt manuel.")
     finally:
@@ -427,7 +431,7 @@ def main():
 
         # En cas de sortie alors que l'audio était en cours → flush/sauvegarde
         if audio_recording and audio_buffer:
-            filename = os.path.join(AUDIO_SAVE_DIR, ts_name("audio", "wav"))
+            filename = os.path.join(ENCRYPTED_SAVE_DIR, ts_name("audio", "wav"))
             write_wav_int16(bytes(audio_buffer), sample_rate, filename)
             print(f"[AUDIO] Sauvegarde de secours : {filename}")
 
