@@ -3,3 +3,5 @@ __pycache__/
 outputs/
 models/
 triggers/*.txt
+*_backup.py
+retranscriptions chiffrées/
