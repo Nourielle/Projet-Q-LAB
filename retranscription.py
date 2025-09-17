@@ -15,14 +15,14 @@ def transcrire_audio(fichier_audio):
 
     try:
         texte = recognizer.recognize_google(audio_data, language="fr-FR")
-        print(f"Transcription réussie")
+        print(f"[AUDIO] Transcription réussie")
         return texte
 
     except sr.UnknownValueError:
-        print("ERREUR : Impossible de comprendre l'audio.")
+        print("ERREUR RETRANSCRIPTION : Impossible de comprendre l'audio.")
         return None
     except sr.RequestError as e:
-        print(f"ERREUR : Connexion à l'API Google : {e}")
+        print(f"ERREUR RETRANSCRIPTION : Connexion à l'API Google : {e}")
         return None
 
 
@@ -38,12 +38,12 @@ def sauvegarder_transcription(texte, fichier_audio):
     with open(chemin_txt, "w", encoding="utf-8") as f:
         f.write(texte)
 
-    print(f"Transcription sauvegardée dans : {chemin_txt}")
+    print(f"[AUDIO] Transcription sauvegardée dans : {chemin_txt}")
     return chemin_txt
 
 
 def chiffrer_transcription(texte, fichier_audio):
-    dossier_chiffre = "retranscriptions chiffrées"
+    dossier_chiffre = "retranscriptions_chiffrees"
     os.makedirs(dossier_chiffre, exist_ok=True)
 
     nom_audio = os.path.basename(fichier_audio)
@@ -60,7 +60,7 @@ def chiffrer_transcription(texte, fichier_audio):
     with open(chemin_chiffre, "w", encoding="utf-8") as f:
         json.dump(bundle, f, indent=2)
 
-    print(f"Transcription chiffrée sauvegardée dans : {chemin_chiffre}")
+    print(f"[AUDIO] Transcription chiffrée sauvegardée dans : {chemin_chiffre}")
 
 
 def main():
@@ -71,13 +71,12 @@ def main():
     fichier_audio = sys.argv[1]
 
     if not os.path.isfile(fichier_audio):
-        print("ERREUR : Fichier audio introuvable :", fichier_audio)
+        print("ERREUR RETRANSCRIPTION : Fichier audio introuvable :", fichier_audio)
         sys.exit(1)
 
     texte = transcrire_audio(fichier_audio)
 
     if texte:
-        #sauvegarder_transcription(texte, fichier_audio)
         chiffrer_transcription(texte, fichier_audio)
 
 
