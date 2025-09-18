@@ -17,6 +17,10 @@ import cv2
 
 from aes_utils import encrypt_bytes
 
+from collections import OrderedDict
+import numpy as np
+
+
 
 # =========================
 # ======  CONFIG  =========
@@ -106,9 +110,83 @@ def encrypt_wav_to_json(wav_path: str, out_dir: str):
     return out_path
 
 
-# =========================
-# ===  VIDEO RECORDER  ====
-# =========================
+
+class FaceTracker:
+    def __init__(self, max_disappeared=120):
+        self.next_face_id = 0
+        self.faces = OrderedDict()
+        self.disappeared = OrderedDict()
+        self.colors = {}
+
+        self.max_disappeared = max_disappeared
+
+    def register(self, centroid):
+        self.faces[self.next_face_id] = centroid
+        self.disappeared[self.next_face_id] = 0
+        self.colors[self.next_face_id] = tuple(np.random.randint(0, 255, 3).tolist())
+        self.next_face_id += 1
+
+    def deregister(self, face_id):
+        del self.faces[face_id]
+        del self.disappeared[face_id]
+        del self.colors[face_id]
+
+    def update(self, rects):
+        if len(rects) == 0:
+            for face_id in list(self.disappeared.keys()):
+                self.disappeared[face_id] += 1
+                if self.disappeared[face_id] > self.max_disappeared:
+                    self.deregister(face_id)
+            return self.faces, self.colors
+
+        input_centroids = np.zeros((len(rects), 2), dtype="int")
+
+        for (i, (x, y, w, h)) in enumerate(rects):
+            cx = int(x + w / 2)
+            cy = int(y + h / 2)
+            input_centroids[i] = (cx, cy)
+
+        if len(self.faces) == 0:
+            for i in range(0, len(input_centroids)):
+                self.register(input_centroids[i])
+        else:
+            face_ids = list(self.faces.keys())
+            face_centroids = list(self.faces.values())
+
+            D = np.linalg.norm(np.array(face_centroids)[:, np.newaxis] - input_centroids, axis=2)
+
+            rows = D.min(axis=1).argsort()
+            cols = D.argmin(axis=1)[rows]
+
+            used_rows = set()
+            used_cols = set()
+
+            for (row, col) in zip(rows, cols):
+                if row in used_rows or col in used_cols:
+                    continue
+
+                face_id = face_ids[row]
+                self.faces[face_id] = input_centroids[col]
+                self.disappeared[face_id] = 0
+
+                used_rows.add(row)
+                used_cols.add(col)
+
+            unused_rows = set(range(0, D.shape[0])) - used_rows
+            unused_cols = set(range(0, D.shape[1])) - used_cols
+
+            for row in unused_rows:
+                face_id = face_ids[row]
+                self.disappeared[face_id] += 1
+                if self.disappeared[face_id] > self.max_disappeared:
+                    self.deregister(face_id)
+
+            for col in unused_cols:
+                self.register(input_centroids[col])
+
+        return self.faces, self.colors
+
+
 
 class VideoRecorder:
     """
@@ -139,6 +217,7 @@ class VideoRecorder:
         self.show_window = show_window
         self.face_rect_color = face_rect_color
         self.face_rect_thickness = face_rect_thickness
+        self.tracker = FaceTracker()
 
         # Charge le classifieur visage (haar cascade)
         if cascade_path is None:
@@ -215,7 +294,6 @@ class VideoRecorder:
                 if not ok:
                     break
 
-                # Détection des visages (sur niveaux de gris)
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 faces = self.face_cascade.detectMultiScale(
                     gray,
@@ -224,15 +302,21 @@ class VideoRecorder:
                     minSize=(60, 60)
                 )
 
-                # Dessine les rectangles verts autour des visages
-                for (x, y, fw, fh) in faces:
-                    cv2.rectangle(
-                        frame,
-                        (x, y),
-                        (x + fw, y + fh),
-                        self.face_rect_color,
-                        self.face_rect_thickness
-                    )
+                tracked_faces, face_colors = self.tracker.update(faces)
+
+                for face_id, centroid in tracked_faces.items():
+                    # Trouve le rectangle correspondant le plus proche
+                    for (x, y, w, h) in faces:
+                        cx = int(x + w / 2)
+                        cy = int(y + h / 2)
+                        if abs(centroid[0] - cx) < 20 and abs(centroid[1] - cy) < 20:
+                            color = face_colors[face_id]
+                            cv2.rectangle(frame, (x, y), (x + w, y + h), color, self.face_rect_thickness)
+                            # Optionnel : afficher l’ID du visage
+                            cv2.putText(frame, f"ID {face_id}", (x, y - 10),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                            break
+
 
                 # Écrit la frame dans la vidéo
                 self._writer.write(frame)
