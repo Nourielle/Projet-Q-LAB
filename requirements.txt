@@ -1,7 +1,11 @@
-pvporcupine pyaudio
+pvporcupine
+pyaudio
 pytz
 SpeechRecognition
 pydub
 keyboard
 pvrecorder
 opencv-python
+cryptography
+numpy
+python-dotenv
