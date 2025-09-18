@@ -1,8 +1,0 @@
-__pycache__/
-*.pyc
-outputs/
-models/
-triggers/*.txt
-*_backup.py
- retranscriptions_chiffrees/
-
