@@ -26,7 +26,8 @@ import numpy as np
 # ======  CONFIG  =========
 # =========================
 
-ACCESS_KEY = os.getenv("PICOVOICE_ACCESS_KEY") or "uBpKa3Nmidsl97vIjlL5yui5zDr2beiZ01v3tjeuDe6ZsMPV636ttg=="  # remplace si besoin
+# clé Picovoice pour utiliser Porcupine 
+ACCESS_KEY = os.getenv("PICOVOICE_ACCESS_KEY") or "uBpKa3Nmidsl97vIjlL5yui5zDr2beiZ01v3tjeuDe6ZsMPV636ttg=="  # CLÉ PORCUPINE À MODIFIER EN FONCTION DU PC 
 
 # Wakewords:
 AUDIO_START_WORD = "computer"
@@ -38,13 +39,12 @@ SENSITIVITY = 0.9
 # Dossiers
 ENCRYPTED_SAVE_DIR = "enregistrements_chiffres"   
 
-# Limites
 MAX_AUDIO_RECORD_S = 300   # 5 minutes max pour l'audio
 
-# Vid�o
+# Vidéo
 VIDEO_FPS = 20
-VIDEO_FOURCC = "mp4v"      # .mp4
-VIDEO_RESOLUTION = None    # None = auto depuis la cam�ra (sinon tuple (1280, 720))
+VIDEO_FOURCC = "mp4v"      # enregistrée en .mp4
+VIDEO_RESOLUTION = None    # résolution par défaut de la caméra 
 DRAW_GREEN_RECT = True     # garde le rectangle vert
 
 
@@ -52,15 +52,19 @@ DRAW_GREEN_RECT = True     # garde le rectangle vert
 # ======  UTILS  ==========
 # =========================
 
+# vérifie l'existence d'un dossier et le crée s'il existe pas 
 def ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
 
+# récupère la date et l'heure de Paris 
 def paris_now():
     return datetime.now(pytz.timezone("Europe/Paris"))
 
+# pour donner un nom aux fichiers enregistrés 
 def ts_name(prefix: str, ext: str):
     return f"{prefix}_{paris_now().strftime('%Y-%m-%d_%H-%M-%S')}.{ext}"
 
+# transforme l'audio enregistré en wav 
 def write_wav_int16(mono_int16_bytes: bytes, sample_rate: int, out_path: str):
     with wave.open(out_path, "wb") as wf:
         wf.setnchannels(1)           # mono
@@ -68,17 +72,9 @@ def write_wav_int16(mono_int16_bytes: bytes, sample_rate: int, out_path: str):
         wf.setframerate(sample_rate)
         wf.writeframes(mono_int16_bytes)
 
+# appelle retranscription.py qui transcrit l'audio et chiffre la trancription 
 def run_transcription(wav_path: str):
-    """
-    Lance la transcription de manière bloquante en appelant retranscription.py.
-    retranscription.py chiffre lui-même le texte, donc ici on attend qu'il finisse
-    puis on peut supprimer le WAV en clair.
-    """
-    script = None
-    if os.path.exists("retranscription_emma.py"):
-        script = ["python", "retranscription_emma.py", wav_path]
-    elif os.path.exists("retranscription.py"):
-        script = ["python", "retranscription.py", wav_path]
+    script = ["python", "retranscription.py", wav_path]
 
     if script:
         try:
@@ -87,13 +83,11 @@ def run_transcription(wav_path: str):
         except Exception as e:
             print(f"[WARN] Impossible de lancer la transcription : {e}")
     else:
-        print("[INFO] Aucun script de transcription trouvé (retranscription_emma.py / retranscription.py).")
+        print("[INFO] Aucun script de transcription trouvé.")
 
 
+# chiffre le wav reçu et écrit le json avec le contenu (nonce et ciphertext) 
 def encrypt_wav_to_json(wav_path: str, out_dir: str):
-    """
-    Lit un WAV, chiffre son contenu et �crit un JSON (nonce + ciphertext, base64 urlsafe).
-    """
     ensure_dir(out_dir)
     with open(wav_path, "rb") as f:
         contenu_audio = f.read()
@@ -110,27 +104,29 @@ def encrypt_wav_to_json(wav_path: str, out_dir: str):
     return out_path
 
 
-
+# suivre les visages et les reconnaitre 
 class FaceTracker:
-    def __init__(self, max_disappeared=120):
+    def __init__(self, max_disappeared=300):  
         self.next_face_id = 0
         self.faces = OrderedDict()
         self.disappeared = OrderedDict()
         self.colors = {}
-
         self.max_disappeared = max_disappeared
 
+    # enregistrer un visage 
     def register(self, centroid):
         self.faces[self.next_face_id] = centroid
         self.disappeared[self.next_face_id] = 0
         self.colors[self.next_face_id] = tuple(np.random.randint(0, 255, 3).tolist())
         self.next_face_id += 1
 
+    # supprimer un visage qui a disparu quinze secondes (300 frames) 
     def deregister(self, face_id):
         del self.faces[face_id]
         del self.disappeared[face_id]
         del self.colors[face_id]
 
+    # fais bouger le rectangle avec le visage 
     def update(self, rects):
         if len(rects) == 0:
             for face_id in list(self.disappeared.keys()):
@@ -187,25 +183,18 @@ class FaceTracker:
         return self.faces, self.colors
 
 
-
+# enregistre une vidéo et affiche le visuel en même temps 
 class VideoRecorder:
-    """
-    Enregistre la vidéo + affiche un aperçu temps réel avec détection des visages (rectangles verts).
-    - Fichier de sortie .mp4 (mp4v)
-    - Ouvre une fenêtre "Enregistrement vidéo"
-    - Stop propre (writer/camera/fenêtre) via .stop()
 
-    Dépendances: opencv-python (cv2) et les haarcascades (incluses via cv2.data.haarcascades).
-    """
     def __init__(
         self,
         save_dir="videos_chiffrees",
         fps=20,
         fourcc="mp4v",
-        resolution=None,               # ex: (1280, 720) ou None pour auto
+        resolution=None,               
         camera_index=0,
         show_window=True,
-        face_rect_color=(0, 255, 0),   # vert
+        face_rect_color=(0, 255, 0),   
         face_rect_thickness=2,
         cascade_path=None              # par défaut: cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
     ):
@@ -233,8 +222,8 @@ class VideoRecorder:
         self._outfile = None
         self._win_name = "Enregistrement vidéo"
 
+    # commence l’enregistrement 
     def start(self):
-        """Démarre l’enregistrement (thread)."""
         if self._thread and self._thread.is_alive():
             print("[VIDEO] Déjà en cours.")
             return
@@ -247,8 +236,8 @@ class VideoRecorder:
         self._thread.start()
         print(f"[VIDEO] Enregistrement démarré → {self._outfile}")
 
+    # arrête l'enregistrement 
     def stop(self):
-        """Demande l’arrêt et attend la fin proprement."""
         if not self._thread:
             return
         self._stop_evt.set()
@@ -256,32 +245,31 @@ class VideoRecorder:
         self._thread = None
         print("[VIDEO] Enregistrement arrêté.")
 
+    # ouvre la caméra 
     def _open_camera(self):
         self._cap = cv2.VideoCapture(self.camera_index)
         if not self._cap.isOpened():
             raise RuntimeError("[VIDEO] Impossible d'ouvrir la caméra.")
 
-        # Résolution voulue
         if self.resolution:
             w, h = self.resolution
             self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
             self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
 
-        # Résolution réelle
         w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        # Writer
         fourcc = cv2.VideoWriter_fourcc(*self.fourcc)
         self._writer = cv2.VideoWriter(self._outfile, fourcc, self.fps, (w, h))
         if not self._writer.isOpened():
             raise RuntimeError("[VIDEO] Impossible d'ouvrir le writer vidéo.")
-        return w, h
+        return w, h 
 
+    # affiche et enregistre la vidéo en temps réel (avec les carrés des visages)
     def _run(self):
         try:
             w, h = self._open_camera()
-            # Petite montée en température de la caméra
+
             for _ in range(5):
                 self._cap.read()
 
@@ -305,34 +293,29 @@ class VideoRecorder:
                 tracked_faces, face_colors = self.tracker.update(faces)
 
                 for face_id, centroid in tracked_faces.items():
-                    # Trouve le rectangle correspondant le plus proche
                     for (x, y, w, h) in faces:
                         cx = int(x + w / 2)
                         cy = int(y + h / 2)
                         if abs(centroid[0] - cx) < 20 and abs(centroid[1] - cy) < 20:
                             color = face_colors[face_id]
                             cv2.rectangle(frame, (x, y), (x + w, y + h), color, self.face_rect_thickness)
-                            # Optionnel : afficher l’ID du visage
                             cv2.putText(frame, f"ID {face_id}", (x, y - 10),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                             break
 
 
-                # Écrit la frame dans la vidéo
                 self._writer.write(frame)
 
                 # Aperçu temps réel
                 if self.show_window:
                     cv2.imshow(self._win_name, frame)
-                    # waitKey(1) pour rafraîchir la fenêtre; ne bloque pas la boucle Porcupine
-                    # On ne gère PAS de touche ici (l’arrêt se fait via mot-clé "terminator")
                     cv2.waitKey(1)
 
         except Exception as e:
             print(f"[VIDEO][ERROR] {e}")
 
         finally:
-            # Libère proprement
+            
             try:
                 if self._writer:
                     self._writer.release()
@@ -350,10 +333,9 @@ class VideoRecorder:
                     pass 
 
 
+# chiffre une vidéo mp4 et sauvegarde un json 
 def encrypt_video_to_json(video_path: str, out_dir="videos_chiffrees"):
-    """
-    Lit un fichier vidéo MP4, chiffre son contenu avec AES-GCM et sauvegarde un JSON.
-    """
+
     ensure_dir(out_dir)
 
     with open(video_path, "rb") as f:
@@ -378,10 +360,10 @@ def encrypt_video_to_json(video_path: str, out_dir="videos_chiffrees"):
 # ======  FUSION  =========
 # =========================
 
+# commence et arrête l'enregistrement audio ou vidéo avec les mots-clés vocaux, transcrit l'audio et chiffre les fichiers 
 def main():
     ensure_dir(ENCRYPTED_SAVE_DIR)
 
-    # Porcupine avec 3 mots-clés (audio start / video start / stop)
     try:
         porcupine = pvporcupine.create(
             access_key=ACCESS_KEY,
@@ -401,7 +383,7 @@ def main():
     recorder = PvRecorder(frame_length=frame_length)
     recorder.start()
 
-    video_rec = VideoRecorder()
+    video_rec = VideoRecorder(camera_index=0) # POUR MODIFIER LA CAMÉRA QUI FILME 
 
     print(f"Écoute en cours…\n"
           f"- Dis '{AUDIO_START_WORD}' pour démarrer l'audio\n"
@@ -416,28 +398,24 @@ def main():
 
     try:
         while not keyboard.is_pressed("space"):
-            pcm = recorder.read()  # list[int16]
-            kw_idx = porcupine.process(pcm)  # -1 si rien
+            pcm = recorder.read()  
+            kw_idx = porcupine.process(pcm)  
 
-            # si on enregistre l'audio, accumule
             if audio_recording:
                 audio_buffer.extend(struct.pack("h" * len(pcm), *pcm))
                 elapsed = time.time() - audio_start_time
                 if elapsed > MAX_AUDIO_RECORD_S:
-                    # auto stop audio
+                    # arrêt auto de l'audio
                     audio_recording = False 
                     filename = os.path.join(ENCRYPTED_SAVE_DIR, ts_name("audio", "wav"))
                     write_wav_int16(bytes(audio_buffer), sample_rate, filename)
                     print(f"[AUDIO] Auto-stop après {MAX_AUDIO_RECORD_S}s → {filename}")
 
-                    # 1) Chiffrer le WAV
                     enc_json = encrypt_wav_to_json(filename, ENCRYPTED_SAVE_DIR)
                     print(f"[AUDIO] Audio chiffré : {enc_json}")
 
-                    # 2) Transcrire + chiffrer le texte
                     run_transcription(filename)
 
-                    # 3) Supprimer le WAV en clair
                     try:
                         os.remove(filename)
                     except Exception:
@@ -446,40 +424,37 @@ def main():
                     audio_buffer.clear()
                     wav_temp_path = None
 
-            # Wakeword handling
-            if kw_idx == 0:  # AUDIO_START_WORD
+            
+            if kw_idx == 0:  # commencer l'enregistrement audio 
                 if not audio_recording:
                     audio_recording = True
                     audio_buffer.clear()
                     audio_start_time = time.time()
                     print(f"[AUDIO] Mot-clé '{AUDIO_START_WORD}' détecté → démarrage de l'enregistrement audio.")
 
-            elif kw_idx == 1:  # VIDEO_START_WORD
+            elif kw_idx == 1:  # commencer l'enregistrement vidép 
                 if not (video_rec._thread and video_rec._thread.is_alive()):
                     video_rec.start()
                 else:
                     print("[VIDEO] Déjà en cours.")
 
-            elif kw_idx == 2:  # STOP_WORD
+            elif kw_idx == 2:  # tout arrêter 
                 any_running = audio_recording or (video_rec._thread and video_rec._thread.is_alive())
                 if any_running:
                     print(f"[ALL] Mot-clé '{STOP_WORD}' détecté → arrêt des enregistrements.")
 
-                # Stop audio si en cours
+                # arrête l'audio si en cours 
                 if audio_recording:
                     audio_recording = False
                     filename = os.path.join(ENCRYPTED_SAVE_DIR, ts_name("audio", "wav"))
                     write_wav_int16(bytes(audio_buffer), sample_rate, filename)
                     print(f"[AUDIO] Enregistrement sauvegardé : {filename}")
 
-                    # 1) Chiffrer le WAV
                     enc_json = encrypt_wav_to_json(filename, ENCRYPTED_SAVE_DIR)
                     print(f"[AUDIO] Audio chiffré : {enc_json}")
 
-                    # 2) Transcrire + chiffrer le texte
                     run_transcription(filename)
 
-                    # 3) Supprimer le WAV en clair
                     try:
                         os.remove(filename)
                     except Exception:
@@ -488,15 +463,14 @@ def main():
                     audio_buffer.clear()
                     wav_temp_path = None
 
-                # Stop vidéo si en cours
+                # arrête la vidéo si en cours
                 if video_rec._thread and video_rec._thread.is_alive():
                     video_rec.stop()
 
-                    # Chiffrement de la vidéo
                     if video_rec._outfile and os.path.exists(video_rec._outfile):
                         encrypt_video_to_json(video_rec._outfile)
                         try:
-                            os.remove(video_rec._outfile)  # supprime la vidéo en clair
+                            os.remove(video_rec._outfile)  
                         except Exception:
                             pass
 
@@ -513,7 +487,7 @@ def main():
         except Exception:
             pass
 
-        # En cas de sortie alors que l'audio était en cours → flush/sauvegarde
+        # sauvegarde si barre ESPACE alors que l'audio était en cours 
         if audio_recording and audio_buffer:
             filename = os.path.join(ENCRYPTED_SAVE_DIR, ts_name("audio", "wav"))
             write_wav_int16(bytes(audio_buffer), sample_rate, filename)
@@ -529,15 +503,15 @@ def main():
             except Exception:
                 pass
 
-        # En cas de sortie alors que la vidéo tournait → stop
+        # arrête si barre ESPACE alors que la vidéo tournait 
         if video_rec._thread and video_rec._thread.is_alive():
             video_rec.stop()
 
-            # Après video_rec.stop()
+            # sauvegarde et encrypte la vidéo 
             if video_rec._outfile and os.path.exists(video_rec._outfile):
                 encrypt_video_to_json(video_rec._outfile)
                 try:
-                    os.remove(video_rec._outfile)  # optionnel : supprime la vidéo en clair
+                    os.remove(video_rec._outfile)  
                 except Exception:
                     pass
 
