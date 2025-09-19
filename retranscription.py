@@ -7,6 +7,7 @@ import base64
 import json
 
 
+# transcrire en texte tout ce qui a été dit dans l'audio récupéré 
 def transcrire_audio(fichier_audio):
     recognizer = sr.Recognizer()
 
@@ -26,6 +27,7 @@ def transcrire_audio(fichier_audio):
         return None
 
 
+# sauvegarde la transcription non-chiffrée 
 def sauvegarder_transcription(texte, fichier_audio):
     dossier_retranscriptions = "retranscriptions"
     os.makedirs(dossier_retranscriptions, exist_ok=True)
@@ -42,6 +44,7 @@ def sauvegarder_transcription(texte, fichier_audio):
     return chemin_txt
 
 
+# chiffre la transcription et la met dans le dossier "retranscriptions_chiffrees"
 def chiffrer_transcription(texte, fichier_audio):
     dossier_chiffre = "retranscriptions_chiffrees"
     os.makedirs(dossier_chiffre, exist_ok=True)
@@ -63,6 +66,7 @@ def chiffrer_transcription(texte, fichier_audio):
     print(f"[AUDIO] Transcription chiffrée sauvegardée dans : {chemin_chiffre}")
 
 
+# transcrit l'audio et le chiffre 
 def main():
     if len(sys.argv) < 2:
         print("Utilisation : python retranscription.py chemin/vers/fichier.wav")
