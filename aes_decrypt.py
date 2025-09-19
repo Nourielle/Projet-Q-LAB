@@ -1,6 +1,9 @@
 import sys, json, base64
 from aes_utils import decrypt_bytes
 
+# décrypte le fichier donné (écrire le chemin et le nom du fichier entre "", 
+# idem pour le nom sous lequel enregistrer le fichier) 
+
 if len(sys.argv) != 3:
     print("Usage: python aes_decrypt.py <fichier.aes.json> <sortie>")
     sys.exit(1)
